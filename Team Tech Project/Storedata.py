@@ -18,13 +18,16 @@ import time
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 
 print('\n\rCAN Rx test')
 print('Bring up CAN0....')
 os.system("sudo /sbin/ip link set can0 up type can bitrate 250000")
-time.sleep(0.1)	
-x = []
+time.sleep(0.1)
+
+log_file = list()
+prev_time = datetime.now()
 try:
 	bus = can.interface.Bus(channel='can0', bustype='socketcan_native')
 except OSError:
@@ -60,20 +63,31 @@ try:
                     #print('int: ', val)
                     val = (val/32768) - 250
                     
-                    print(val)
+                    
+                    #print(val)
+                    string_to_write = {'timestamp': message.timestamp,'data' : val}
+                    #print(string_to_write)
+                    log_file.append(string_to_write)
+                    #print(log_file)
                     
                     #pitchangle = int(hex9val, 16)
                     #pitchangle = pitchangle*(1/32768)
                     #pitchangle = pitchangle - 250
-	                     
-                    
+                    cur_time = datetime.now()
+                    #print((cur_time - prev_time).total_seconds())
+                    if((cur_time - prev_time).total_seconds() >= 0.1 * 60):
+                        print("its been 10 minutes")
+                        df = pd.DataFrame(log_file)                                   
+                        df.to_csv("Storedata.csv", index = False)      
+                        prev_time = cur_time
+                        
 		for i in range(message.dlc):
 			s +=  '{0:x} '.format(message.data[i])
 			
 		#print(' {}'.format(c+s))
 		
 		
-#scrolling plot		
+#scrolling plot/running plot		
                 
 
 except KeyboardInterrupt:
