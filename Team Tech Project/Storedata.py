@@ -18,16 +18,25 @@ import time
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from datetime import datetime
-
+import numpy as np
 
 print('\n\rCAN Rx test')
 print('Bring up CAN0....')
 os.system("sudo /sbin/ip link set can0 up type can bitrate 250000")
 time.sleep(0.1)
 
+#Initialize variables
 log_file = list()
-prev_time = datetime.now()
+xs = list()
+ys = list()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+
+
+
 try:
 	bus = can.interface.Bus(channel='can0', bustype='socketcan_native')
 except OSError:
@@ -36,61 +45,70 @@ except OSError:
 	
 print('Ready')
 
+#function to plot livestream data from a canbus for a channel
+def animate(i, xs, ys):
+    global prev_time, log_file
+    try:
+        message = bus.recv()	# Wait until a message is received.
+            
+        if message.arbitration_id == 217065857:    #sorts the data based on it's PGN value and converts it to the appropriate value using the JSAE-1939 file
+            byte1 = str(hex(message.data[0]))[2:]                  
+            byte1 ='{:0<2}'.format(byte1)
+            byte2 = str(hex(message.data[1]))[2:]                  
+            byte2 ='{:0<2}'.format(byte2)
+            byte3 = str(hex(message.data[2]))[2:]                  
+            byte3 ='{:0<2}'.format(byte3)
+            val = byte3 + byte2 + byte1
+            val = int(val, 16)
+            val = (val/32768) - 250
+            
+            string_to_write = {'timestamp': message.timestamp,'data' : val}
+            log_file.append(string_to_write)
+            
+            
+            cur_time = datetime.now()
+            if((cur_time - prev_time).total_seconds() >= 1 * 60):    #Stores a datapoint every minute to Storedata.csv
+                print("its been one minutes")
+                df = pd.DataFrame(log_file)
+                path = os.path.join(os.getcwd(), str(cur_time) + ".csv") 
+                df.to_csv(path, index = False)      
+                prev_time = cur_time
+                log_file = list()
+                print(log_file)
+            msg_time = (time.strftime('%H:%M:%S.%f', time.localtime(message.timestamp)))   #converts timestamp from epoch time to standard time
+           
+            ys.append(val)
+            xs = np.arange(len(ys))
+            
+            #Plots each datapoint in a continuously updating frame                
+            ax.clear()
+            ax.plot(xs,ys)
+            plt.xticks(rotation = 45, ha = 'right')
+            plt.subplots_adjust(bottom = 0.3)
+            plt.title('pitch angle vs time')
+            plt.ylabel('Pitch angle')
+            plt.xlabel('Current time: ' + msg_time)
+
+        
+    except KeyboardInterrupt:
+        print("Keyboard interrupt")
+        os.system("sudo /sbin/ip link set can0 down")
+        print("Bring can down")
+
+
+# This calls the animate function to create a running plot of the livestream data. When the code is interrupted, the canbus is set down ending the livestream plot.
 try:
-	while True:
-		message = bus.recv()	# Wait until a message is received.
-		
-		c = '{0:f} {1:x} {2:x} '.format(message.timestamp, message.arbitration_id, message.dlc)
-		s=''
-		#pitchangle = message.data[3]+ message.data[2] + message.data[1]
-		d = ' {}'.format(c+s)
-		
-		
-		if message.arbitration_id == 217065857:
-                    #pitchangle = hex(message.data[3])+ hex(message.data[2]) + hex(message.data[1])
-                    #hex, string, concatonate, convert that string into a decimal
-                    #x.append(d)
-                    #print(x)
-                    byte1 = str(hex(message.data[0]))[2:]                  
-                    byte1 ='{:0<2}'.format(byte1)
-                    byte2 = str(hex(message.data[1]))[2:]                  
-                    byte2 ='{:0<2}'.format(byte2)
-                    byte3 = str(hex(message.data[2]))[2:]                  
-                    byte3 ='{:0<2}'.format(byte3)
-                    val = byte3 + byte2 + byte1
-                    #print ('hex: ', val)
-                    val = int(val, 16)
-                    #print('int: ', val)
-                    val = (val/32768) - 250
-                    
-                    
-                    #print(val)
-                    string_to_write = {'timestamp': message.timestamp,'data' : val}
-                    #print(string_to_write)
-                    log_file.append(string_to_write)
-                    #print(log_file)
-                    
-                    #pitchangle = int(hex9val, 16)
-                    #pitchangle = pitchangle*(1/32768)
-                    #pitchangle = pitchangle - 250
-                    cur_time = datetime.now()
-                    #print((cur_time - prev_time).total_seconds())
-                    if((cur_time - prev_time).total_seconds() >= 0.1 * 60):
-                        print("its been 10 minutes")
-                        df = pd.DataFrame(log_file)                                   
-                        df.to_csv("Storedata.csv", index = False)      
-                        prev_time = cur_time
-                        
-		for i in range(message.dlc):
-			s +=  '{0:x} '.format(message.data[i])
-			
-		#print(' {}'.format(c+s))
-		
-		
-#scrolling plot/running plot		
+    prev_time = datetime.now()               
+    ani= animation.FuncAnimation(fig, animate, fargs= (xs, ys), interval = 100)            
+    plt.show()            
+    
+except KeyboardInterrupt:
+    print("Keyboard inteedferrupt")
+    os.system("sudo /sbin/ip link set can0 down")
+    print("\n\rBring can down")
+    
+            
                 
 
-except KeyboardInterrupt:
-	#Catch keyboard interrupt
-	os.system("sudo /sbin/ip link set can0 down")
-	print('\n\rKeyboard interrtupt')
+
+	
