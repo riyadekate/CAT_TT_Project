@@ -13,12 +13,7 @@ import matplotlib.pyplot as plt
 inc_df = pd.read_csv(r'Inclinometerdata.txt', '\t', skip_blank_lines = True)
 inc_df.columns = ['Date', 'PGN','IDK', 'IDK','1', '2', '3', '4', '5', '6', '7', '8']
 inc_df = inc_df.dropna(how = 'any')
-# time???????
 
-#inc_df['Date'] = inc_df['Date'].astype(float)
-#inc_df['Date'] = dt.datetime.fromtimestamp(inc_df['Date'].strftime('%c'))
-
-#inc_df.Date = inc_df.Date.apply(lambda d: datetime.strptime(d, "%Y-%m-%d"))
 
 inc_df['Date'] = pd.to_datetime(inc_df['Date'],unit='s')
 
@@ -42,7 +37,6 @@ inc2_df['Pitchangleconv'] = inc2_df['Pitchangleconv'].apply(lambda x: x*(1/32768
 inc2_df['Pitchangleconv'] = inc2_df['Pitchangleconv'].apply(lambda x: x - 250 )
 
 
-#plt.plot(inc1_df['Date'], inc1_df['Pitchangleconv'],'-ok')
 
 input1 = input("Please chooose a channel: Inc1 or Inc 2   ")
 x = str(input1)
